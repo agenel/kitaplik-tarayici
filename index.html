@@ -388,8 +388,14 @@ function handleIsbn(isbn) {
   });
 }
 
-/* Google Books → Open Library */
+/* Önce backend (D&R → Google Books → Open Library, sunucu taraflı); backend ulaşılamazsa istemciden dene */
 function lookupBook(isbn) {
+  return apiGet({ action: 'lookup', isbn: isbn })
+    .then(function (d) { return (d && d.title) ? d : clientLookup(isbn); })
+    .catch(function () { return clientLookup(isbn); });
+}
+
+function clientLookup(isbn) {
   return fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + '&country=TR')
     .then(function (r) { return r.json(); })
     .then(function (d) {
@@ -410,15 +416,18 @@ function lookupBook(isbn) {
 function guessCategory(rawCat, title) {
   var s = norm(rawCat + ' ' + title);
   var map = [
-    [/science fiction|sci fi/, 'Bilim Kurgu'],
+    [/science fiction|sci fi|bilim kurgu|bilimkurgu/, 'Bilim Kurgu'],
     [/fantasy|fantastik/, 'Fantastik'],
     [/philosoph|felsefe/, 'Felsefe'],
-    [/comic|graphic novel|cizgi/, 'Çizgi Roman'],
-    [/horror|korku/, 'Korku'],
+    [/comic|graphic novel|cizgi roman|manga/, 'Çizgi Roman'],
+    [/horror|korku|gerilim/, 'Korku'],
     [/humor|mizah/, 'Mizah'],
     [/psycholog|psikoloji/, 'Psikoloji'],
     [/drama|theater|tiyatro/, 'Tiyatro'],
-    [/physics|science|astronom|cosmolog|biology|mathemat|evrim|bilim/, 'Popüler Bilim']
+    [/dergi/, 'Dergi'],
+    [/deneme/, 'Deneme'],
+    [/macera/, 'Macera'],
+    [/physics|science|astronom|cosmolog|biology|mathemat|evrim|populer bilim|arastirma|tarih|bilim/, 'Popüler Bilim']
   ];
   for (var i = 0; i < map.length; i++) if (map[i][0].test(s)) return map[i][1];
   return '';
@@ -476,7 +485,7 @@ function showAddForm(info, isbn) {
     '<label>Kitap Adı</label><input type="text" id="fTitle" value="' + esc(info.title) + '">' +
     '<label>Yazar</label><input type="text" id="fAuthor" value="' + esc(info.author) + '">' +
     '<label>Kategori</label><select id="fCat">' + opts + '</select>' +
-    '<div class="meta" style="margin-top:8px">ISBN: ' + isbn + '</div>' +
+    '<div class="meta" style="margin-top:8px">ISBN: ' + isbn + (info.source ? ' · Kaynak: ' + esc(info.source) : '') + '</div>' +
     '<div class="row2"><button class="btn btn-green" id="addBtn">➕ Listeye Ekle</button><button class="btn btn-gray" id="cancelBtn">Vazgeç</button></div>');
   $('addBtn').onclick = function () { submitAdd(isbn); };
   $('cancelBtn').onclick = function () { delete scannedThisSession[isbn]; clearCard(); };
