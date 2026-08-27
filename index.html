@@ -441,7 +441,8 @@ function showCard(cls, html) {
 
 function showFound(book, isbn, byTitle) {
   beep(660, 80);
-  var needIsbn = !book.isbn && isbn;
+  // '--' = "arandı ama bulunamadı" işareti: tarama gerçek ISBN'i bulduysa üstüne yazmayı öner
+  var needIsbn = (!book.isbn || book.isbn === '--') && isbn;
   var html = '<h2>✅ Listede var — #' + book.nu + '</h2>' +
     '<div class="bookline">' + esc(book.title) + '</div>' +
     '<div class="meta">' + esc(book.author) + ' · ' + esc(book.category) + '</div>';
