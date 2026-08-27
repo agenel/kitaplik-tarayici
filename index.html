@@ -5,70 +5,179 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Kitaplık Tarayıcı</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     :root {
-      --bg: #0f1420; --panel: #1a2233; --panel2: #232e45; --text: #e8ecf4; --muted: #8b96ab;
-      --green: #2ecc71; --amber: #f5b041; --red: #e74c3c; --blue: #4a9eff;
+      --bg: #090c14;
+      --surface: rgba(255, 255, 255, .045);
+      --surface-2: rgba(255, 255, 255, .08);
+      --border: rgba(255, 255, 255, .09);
+      --text: #eef1f8;
+      --muted: #98a2b8;
+      --accent: #34d399;      /* zümrüt */
+      --accent-2: #0ea5a0;    /* teal   */
+      --blue: #60a5fa;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --radius: 18px;
+      --shadow: 0 10px 30px -12px rgba(0, 0, 0, .55);
     }
-    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 30px; }
-    header { padding: 14px 16px 10px; display: flex; align-items: baseline; justify-content: space-between; }
-    header h1 { font-size: 18px; font-weight: 700; }
-    #stats { font-size: 13px; color: var(--muted); }
-    .wrap { max-width: 520px; margin: 0 auto; padding: 0 12px; }
+    html { color-scheme: dark; }
+    body {
+      font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background:
+        radial-gradient(60vw 40vh at 85% -5%, rgba(52, 211, 153, .13), transparent 60%),
+        radial-gradient(55vw 35vh at 0% 0%, rgba(96, 165, 250, .10), transparent 55%),
+        var(--bg);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: max(34px, env(safe-area-inset-bottom));
+      font-size: 15px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 480px; margin: 0 auto; padding: 0 16px; }
 
-    /* Kamera */
-    #videoBox { position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 3/2; display: none; }
-    #videoBox.on { display: block; }
-    #video { width: 100%; height: 100%; object-fit: cover; }
-    #scanline { position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: rgba(255,60,60,.85); box-shadow: 0 0 10px rgba(255,60,60,.8); border-radius: 2px; }
-    #camHint { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,.75); text-shadow: 0 1px 3px #000; }
+    /* ---- Üst bar ---- */
+    header { padding: 20px 16px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .logo {
+      width: 40px; height: 40px; flex-shrink: 0; border-radius: 13px; display: grid; place-items: center; font-size: 20px;
+      background: linear-gradient(135deg, rgba(52,211,153,.22), rgba(14,165,160,.12));
+      border: 1px solid rgba(52, 211, 153, .28);
+      box-shadow: 0 4px 18px -6px rgba(52, 211, 153, .35);
+    }
+    .brand h1 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+    .brand small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: .01em; }
+    #stats {
+      font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap;
+      padding: 7px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border);
+    }
 
-    .btn { display: block; width: 100%; padding: 14px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; color: #fff; }
-    .btn:active { transform: scale(.98); }
-    .btn-blue { background: var(--blue); }
-    .btn-green { background: var(--green); color: #08331a; }
-    .btn-gray { background: var(--panel2); color: var(--text); }
-    .btn[disabled] { opacity: .5; }
+    /* ---- Kamera / vizör ---- */
+    #videoBox {
+      position: relative; border-radius: var(--radius); overflow: hidden; background: #000;
+      aspect-ratio: 3/2; display: none; margin-top: 4px;
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    #videoBox.on { display: block; animation: rise .3s ease; }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .vf { position: absolute; width: 26px; height: 26px; border: 3px solid rgba(255,255,255,.9); border-radius: 2px; }
+    .vf.tl { top: 14px; left: 14px; border-right: 0; border-bottom: 0; border-top-left-radius: 10px; }
+    .vf.tr { top: 14px; right: 14px; border-left: 0; border-bottom: 0; border-top-right-radius: 10px; }
+    .vf.bl { bottom: 14px; left: 14px; border-right: 0; border-top: 0; border-bottom-left-radius: 10px; }
+    .vf.br { bottom: 14px; right: 14px; border-left: 0; border-top: 0; border-bottom-right-radius: 10px; }
+    #scanline {
+      position: absolute; left: 10%; right: 10%; top: 18%; height: 2px; border-radius: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent) 25%, var(--accent) 75%, transparent);
+      box-shadow: 0 0 14px rgba(52, 211, 153, .8);
+      animation: sweep 2.4s ease-in-out infinite;
+    }
+    @keyframes sweep { 0%, 100% { top: 18%; } 50% { top: 78%; } }
+    #camHint {
+      position: absolute; bottom: 12px; left: 0; right: 0; text-align: center;
+      font-size: 12px; font-weight: 500; color: rgba(255,255,255,.85); text-shadow: 0 1px 4px rgba(0,0,0,.8);
+    }
+
+    /* ---- Düğmeler ---- */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 15px 18px; border: 1px solid transparent; border-radius: 14px;
+      font: inherit; font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+      cursor: pointer; margin-top: 12px; color: #fff;
+      transition: transform .12s ease, filter .15s ease, background .15s ease;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-green {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #04231a;
+      box-shadow: 0 8px 24px -8px rgba(52, 211, 153, .5);
+    }
+    .btn-green:hover { filter: brightness(1.06); }
+    .btn-blue { background: rgba(96, 165, 250, .14); border-color: rgba(96, 165, 250, .3); color: #bcd7fd; }
+    .btn-blue:hover { background: rgba(96, 165, 250, .2); }
+    .btn-gray { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn-gray:hover { background: var(--surface-2); }
+    .btn[disabled] { opacity: .45; pointer-events: none; }
     .row2 { display: flex; gap: 10px; }
     .row2 .btn { flex: 1; }
 
-    /* Manuel giriş */
-    #manualBox { display: flex; gap: 8px; margin-top: 10px; }
-    #manualIsbn { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--panel2); background: var(--panel); color: var(--text); font-size: 16px; }
-    #manualBtn { width: auto; padding: 12px 18px; margin: 0; }
+    /* ---- Girişler ---- */
+    #manualBox { display: flex; gap: 10px; margin-top: 12px; }
+    #manualIsbn { flex: 1; margin: 0; }
+    #manualBtn { width: auto; padding: 13px 22px; margin: 0; }
+    label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 6px; }
+    input[type=text], input[type=url], select {
+      width: 100%; padding: 13px 14px; border-radius: 12px;
+      border: 1px solid var(--border); background: rgba(0, 0, 0, .25); color: var(--text);
+      font: inherit; font-size: 15px; transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    input:focus, select:focus { outline: none; border-color: rgba(52, 211, 153, .55); box-shadow: 0 0 0 3px rgba(52, 211, 153, .14); }
+    select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2398a2b8' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px; }
 
-    /* Kartlar */
-    .card { background: var(--panel); border-radius: 14px; padding: 16px; margin-top: 12px; border-left: 4px solid var(--panel2); }
-    .card.ok { border-left-color: var(--green); }
-    .card.new { border-left-color: var(--blue); }
-    .card.maybe { border-left-color: var(--amber); }
-    .card.err { border-left-color: var(--red); }
-    .card h2 { font-size: 15px; margin-bottom: 8px; }
+    /* ---- Kartlar ---- */
+    .card {
+      position: relative; overflow: hidden;
+      background: var(--surface);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 18px; margin-top: 14px; box-shadow: var(--shadow);
+      animation: rise .3s ease;
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--border); }
+    .card.ok::before { background: linear-gradient(180deg, var(--accent), var(--accent-2)); }
+    .card.new::before { background: var(--blue); }
+    .card.maybe::before { background: var(--amber); }
+    .card.err::before { background: var(--red); }
+    .card h2 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 8px; }
     .card .meta { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-    .bookline { font-size: 16px; font-weight: 600; margin: 6px 0 2px; }
+    .bookline { font-size: 17px; font-weight: 700; letter-spacing: -.015em; margin: 8px 0 3px; }
 
-    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-    input[type=text], input[type=url], select { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--panel2); background: var(--panel2); color: var(--text); font-size: 15px; }
+    /* ---- Geçmiş ---- */
+    #history { margin-top: 26px; }
+    #history h3 { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; padding-left: 2px; }
+    .hitem {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 11px 14px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; margin-bottom: 8px; font-size: 13px; animation: rise .25s ease;
+    }
+    .hitem span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hitem .tag { flex-shrink: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; padding: 4px 9px; border-radius: 999px; }
+    .tag.ok { color: var(--accent); background: rgba(52, 211, 153, .12); border: 1px solid rgba(52, 211, 153, .25); }
+    .tag.new { color: var(--blue); background: rgba(96, 165, 250, .12); border: 1px solid rgba(96, 165, 250, .25); }
+    .tag.err { color: var(--red); background: rgba(248, 113, 113, .12); border: 1px solid rgba(248, 113, 113, .25); }
 
-    /* Geçmiş */
-    #history { margin-top: 18px; }
-    #history h3 { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    .hitem { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--panel); border-radius: 10px; margin-bottom: 6px; font-size: 13px; }
-    .hitem .tag { flex-shrink: 0; font-weight: 700; }
-    .tag.ok { color: var(--green); } .tag.new { color: var(--blue); } .tag.err { color: var(--red); }
+    #settingsLink { display: block; text-align: center; margin-top: 30px; font-size: 12px; color: var(--muted); cursor: pointer; opacity: .8; }
+    #settingsLink:hover { color: var(--text); text-decoration: underline; }
 
-    #settingsLink { display: block; text-align: center; margin-top: 24px; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; }
-
-    #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #000c; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90%; }
-    #toast.show { opacity: 1; }
-    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--text); border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -2px; }
+    /* ---- Bildirim ---- */
+    #toast {
+      position: fixed; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(6px);
+      background: rgba(18, 22, 34, .92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border); color: var(--text);
+      padding: 11px 20px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+      opacity: 0; transition: opacity .25s ease, transform .25s ease;
+      pointer-events: none; max-width: 90%; box-shadow: var(--shadow); z-index: 10;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--accent); border-radius: 50%; animation: sp .8s linear infinite; vertical-align: -2px; }
     @keyframes sp { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 <header class="wrap">
-  <h1>📚 Kitaplık Tarayıcı</h1>
+  <div class="brand">
+    <div class="logo">📚</div>
+    <div>
+      <h1>Kitaplık Tarayıcı</h1>
+      <small>barkodla tara · listeyle eşleştir</small>
+    </div>
+  </div>
   <div id="stats"></div>
 </header>
 
@@ -83,7 +192,12 @@
   </div>
 
   <div id="app" style="display:none">
-    <div id="videoBox"><video id="video" playsinline muted></video><div id="scanline"></div><div id="camHint">Barkodu kırmızı çizgiye hizala</div></div>
+    <div id="videoBox">
+      <video id="video" playsinline muted></video>
+      <div class="vf tl"></div><div class="vf tr"></div><div class="vf bl"></div><div class="vf br"></div>
+      <div id="scanline"></div>
+      <div id="camHint">Barkodu çerçevenin içine hizala</div>
+    </div>
     <button class="btn btn-green" id="camBtn" disabled>📷 Canlı Taramayı Başlat</button>
     <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
     <button class="btn btn-blue" id="photoBtn" disabled>📸 Fotoğrafla Tara</button>
