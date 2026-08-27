@@ -29,21 +29,39 @@
     body {
       font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
       background:
-        radial-gradient(60vw 40vh at 85% -5%, rgba(52, 211, 153, .13), transparent 60%),
-        radial-gradient(55vw 35vh at 0% 0%, rgba(96, 165, 250, .10), transparent 55%),
+        radial-gradient(70vw 55vh at 50% -10%, rgba(52, 211, 153, .10), transparent 60%),
+        radial-gradient(50vw 40vh at 12% 90%, rgba(96, 165, 250, .07), transparent 55%),
         var(--bg);
       background-attachment: fixed;
       color: var(--text);
-      min-height: 100vh;
-      padding-bottom: max(34px, env(safe-area-inset-bottom));
+      min-height: 100vh; min-height: 100dvh;
+      display: flex;
       font-size: 15px;
       line-height: 1.45;
       -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+    /* Sayfa kabuğu: içerik ekranın ortasına oturur, uzayınca normal akar */
+    .page {
+      margin: auto;
+      width: min(480px, 100%);
+      padding: 4vh 18px calc(4vh + env(safe-area-inset-bottom));
+    }
+    .wrap { width: 100%; }
 
     /* ---- Üst bar ---- */
-    header { padding: 20px 16px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    header { padding: 0 4px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+    /* ---- Tarama paneli ---- */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .panel .btn:first-of-type { margin-top: 0; }
+    #videoBox.on + .btn, #videoBox.on ~ #camBtn { margin-top: 14px; }
     .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
     .logo {
       width: 40px; height: 40px; flex-shrink: 0; border-radius: 13px; display: grid; place-items: center; font-size: 20px;
@@ -61,7 +79,7 @@
     /* ---- Kamera / vizör ---- */
     #videoBox {
       position: relative; border-radius: var(--radius); overflow: hidden; background: #000;
-      aspect-ratio: 3/2; display: none; margin-top: 4px;
+      aspect-ratio: 3/2; display: none;
       border: 1px solid var(--border); box-shadow: var(--shadow);
     }
     #videoBox.on { display: block; animation: rise .3s ease; }
@@ -170,18 +188,18 @@
   </style>
 </head>
 <body>
-<header class="wrap">
-  <div class="brand">
-    <div class="logo">📚</div>
-    <div>
-      <h1>Kitaplık Tarayıcı</h1>
-      <small>barkodla tara · listeyle eşleştir</small>
+<div class="page">
+  <header>
+    <div class="brand">
+      <div class="logo">📚</div>
+      <div>
+        <h1>Kitaplık Tarayıcı</h1>
+        <small>barkodla tara · listeyle eşleştir</small>
+      </div>
     </div>
-  </div>
-  <div id="stats"></div>
-</header>
+    <div id="stats"></div>
+  </header>
 
-<div class="wrap">
   <!-- İlk kurulum: API adresi -->
   <div id="setupCard" class="card new" style="display:none">
     <h2>🔗 Kurulum — bir kez yapılır</h2>
@@ -192,19 +210,21 @@
   </div>
 
   <div id="app" style="display:none">
-    <div id="videoBox">
-      <video id="video" playsinline muted></video>
-      <div class="vf tl"></div><div class="vf tr"></div><div class="vf bl"></div><div class="vf br"></div>
-      <div id="scanline"></div>
-      <div id="camHint">Barkodu çerçevenin içine hizala</div>
-    </div>
-    <button class="btn btn-green" id="camBtn" disabled>📷 Canlı Taramayı Başlat</button>
-    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
-    <button class="btn btn-blue" id="photoBtn" disabled>📸 Fotoğrafla Tara</button>
-    <div id="manualBox">
-      <input id="manualIsbn" type="text" inputmode="numeric" placeholder="ISBN elle gir (978…)">
-      <button class="btn btn-gray" id="manualBtn">Ara</button>
-    </div>
+    <section class="panel">
+      <div id="videoBox">
+        <video id="video" playsinline muted></video>
+        <div class="vf tl"></div><div class="vf tr"></div><div class="vf bl"></div><div class="vf br"></div>
+        <div id="scanline"></div>
+        <div id="camHint">Barkodu çerçevenin içine hizala</div>
+      </div>
+      <button class="btn btn-green" id="camBtn" disabled>📷&nbsp; Canlı Taramayı Başlat</button>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+      <button class="btn btn-blue" id="photoBtn" disabled>📸&nbsp; Fotoğrafla Tara</button>
+      <div id="manualBox">
+        <input id="manualIsbn" type="text" inputmode="numeric" placeholder="ISBN elle gir (978…)">
+        <button class="btn btn-gray" id="manualBtn">Ara</button>
+      </div>
+    </section>
 
     <div id="result"></div>
 
@@ -352,7 +372,7 @@ function startCam() {
       stream = s;
       var v = $('video'); v.srcObject = s; v.play();
       $('videoBox').classList.add('on');
-      $('camBtn').textContent = '⏹ Taramayı Durdur';
+      $('camBtn').textContent = '⏹\u00A0 Taramayı Durdur';
       $('camBtn').className = 'btn btn-gray';
       scanning = true;
       if ('BarcodeDetector' in window) {
@@ -374,7 +394,7 @@ function stopCam() {
   if (zxingReader) { try { zxingReader.reset(); } catch (e) {} zxingReader = null; }
   if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
   $('videoBox').classList.remove('on');
-  $('camBtn').textContent = '📷 Canlı Taramayı Başlat';
+  $('camBtn').textContent = '📷\u00A0 Canlı Taramayı Başlat';
   $('camBtn').className = 'btn btn-green';
 }
 function pollNative() {
