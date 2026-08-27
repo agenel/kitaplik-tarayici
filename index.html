@@ -453,6 +453,7 @@ function showFound(book, isbn, byTitle) {
   }
   showCard('ok', html);
   addHist('ok', '#' + book.nu + ' ' + book.title);
+  logScan(isbn || book.isbn, book.title, book.author, 'Listede var (#' + book.nu + ')');
   if (needIsbn) {
     $('saveIsbnBtn').onclick = function () {
       var btn = this; btn.disabled = true;
@@ -497,6 +498,7 @@ function showNotFoundForm(isbn) {
   showAddForm({ title: '', author: '', rawCat: '' }, isbn);
   $('result').querySelector('h2').innerHTML = '⚠️ ' + isbn + ' hiçbir kaynakta bulunamadı — elle gir:';
   addHist('err', isbn + ' bulunamadı');
+  logScan(isbn, '', '', 'Bulunamadı');
 }
 
 function submitAdd(isbn) {
@@ -510,6 +512,7 @@ function submitAdd(isbn) {
       $('stats').textContent = LIB.books.length + ' kitap yüklü';
       toast('✓ #' + rec.nu + ' olarak eklendi');
       addHist('new', '#' + rec.nu + ' ' + rec.title);
+      logScan(isbn, rec.title, rec.author, 'Eklendi (#' + rec.nu + ')');
       beep(1040, 120);
       clearCard();
     })
@@ -520,6 +523,11 @@ function submitAdd(isbn) {
 }
 
 function clearCard() { $('result').innerHTML = ''; }
+
+/* Taramayı sheet'teki "Tarama Geçmişi" sayfasına arka planda kaydet (hata olsa da akışı bozmaz) */
+function logScan(isbn, title, author, status) {
+  try { apiPost({ action: 'logScan', isbn: isbn || '', title: title || '', author: author || '', status: status }).catch(function () {}); } catch (e) {}
+}
 
 function addHist(cls, text) {
   $('histTitle').style.display = 'block';
