@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Kitaplık Tarayıcı</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #0f1420; --panel: #1a2233; --panel2: #232e45; --text: #e8ecf4; --muted: #8b96ab;
+      --green: #2ecc71; --amber: #f5b041; --red: #e74c3c; --blue: #4a9eff;
+    }
+    body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 30px; }
+    header { padding: 14px 16px 10px; display: flex; align-items: baseline; justify-content: space-between; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    #stats { font-size: 13px; color: var(--muted); }
+    .wrap { max-width: 520px; margin: 0 auto; padding: 0 12px; }
+
+    /* Kamera */
+    #videoBox { position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 3/2; display: none; }
+    #videoBox.on { display: block; }
+    #video { width: 100%; height: 100%; object-fit: cover; }
+    #scanline { position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: rgba(255,60,60,.85); box-shadow: 0 0 10px rgba(255,60,60,.8); border-radius: 2px; }
+    #camHint { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,.75); text-shadow: 0 1px 3px #000; }
+
+    .btn { display: block; width: 100%; padding: 14px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; color: #fff; }
+    .btn:active { transform: scale(.98); }
+    .btn-blue { background: var(--blue); }
+    .btn-green { background: var(--green); color: #08331a; }
+    .btn-gray { background: var(--panel2); color: var(--text); }
+    .btn[disabled] { opacity: .5; }
+    .row2 { display: flex; gap: 10px; }
+    .row2 .btn { flex: 1; }
+
+    /* Manuel giriş */
+    #manualBox { display: flex; gap: 8px; margin-top: 10px; }
+    #manualIsbn { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--panel2); background: var(--panel); color: var(--text); font-size: 16px; }
+    #manualBtn { width: auto; padding: 12px 18px; margin: 0; }
+
+    /* Kartlar */
+    .card { background: var(--panel); border-radius: 14px; padding: 16px; margin-top: 12px; border-left: 4px solid var(--panel2); }
+    .card.ok { border-left-color: var(--green); }
+    .card.new { border-left-color: var(--blue); }
+    .card.maybe { border-left-color: var(--amber); }
+    .card.err { border-left-color: var(--red); }
+    .card h2 { font-size: 15px; margin-bottom: 8px; }
+    .card .meta { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    .bookline { font-size: 16px; font-weight: 600; margin: 6px 0 2px; }
+
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    input[type=text], input[type=url], select { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--panel2); background: var(--panel2); color: var(--text); font-size: 15px; }
+
+    /* Geçmiş */
+    #history { margin-top: 18px; }
+    #history h3 { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .hitem { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--panel); border-radius: 10px; margin-bottom: 6px; font-size: 13px; }
+    .hitem .tag { flex-shrink: 0; font-weight: 700; }
+    .tag.ok { color: var(--green); } .tag.new { color: var(--blue); } .tag.err { color: var(--red); }
+
+    #settingsLink { display: block; text-align: center; margin-top: 24px; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+
+    #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #000c; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90%; }
+    #toast.show { opacity: 1; }
+    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--text); border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -2px; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<header class="wrap">
+  <h1>📚 Kitaplık Tarayıcı</h1>
+  <div id="stats"></div>
+</header>
+
+<div class="wrap">
+  <!-- İlk kurulum: API adresi -->
+  <div id="setupCard" class="card new" style="display:none">
+    <h2>🔗 Kurulum — bir kez yapılır</h2>
+    <div class="meta">Google Sheet'e bağlanmak için Apps Script web uygulamasının adresini yapıştır (https://script.google.com/macros/s/…/exec ile biter). Bu adres sadece bu cihazda saklanır.</div>
+    <label>Web uygulaması adresi</label>
+    <input type="url" id="apiInput" placeholder="https://script.google.com/macros/s/…/exec">
+    <button class="btn btn-green" id="apiSaveBtn">Bağlan</button>
+  </div>
+
+  <div id="app" style="display:none">
+    <div id="videoBox"><video id="video" playsinline muted></video><div id="scanline"></div><div id="camHint">Barkodu kırmızı çizgiye hizala</div></div>
+    <button class="btn btn-green" id="camBtn" disabled>📷 Canlı Taramayı Başlat</button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+    <button class="btn btn-blue" id="photoBtn" disabled>📸 Fotoğrafla Tara</button>
+    <div id="manualBox">
+      <input id="manualIsbn" type="text" inputmode="numeric" placeholder="ISBN elle gir (978…)">
+      <button class="btn btn-gray" id="manualBtn">Ara</button>
+    </div>
+
+    <div id="result"></div>
+
+    <div id="history"><h3 id="histTitle" style="display:none">Bu oturumda</h3><div id="histList"></div></div>
+    <span id="settingsLink">bağlantı adresini değiştir</span>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= Durum ================= */
+var API = '';
+var LIB = { books: [], categories: [] };
+var scannedThisSession = {};
+var scanning = false;
+var stream = null, detector = null, zxingReader = null, scanTimer = null;
+var lastDetect = { code: '', t: 0 };
+var busy = false;
+
+/* ================= Yardımcılar ================= */
+function $(id) { return document.getElementById(id); }
+function toast(msg, ms) {
+  var t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, ms || 2200);
+}
+function beep(freq, dur) {
+  try {
+    var ctx = beep._ctx || (beep._ctx = new (window.AudioContext || window.webkitAudioContext)());
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    o.start(); o.stop(ctx.currentTime + dur / 1000);
+  } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate(60);
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+/* ================= API (Apps Script) ================= */
+function apiGet(params) {
+  var q = Object.keys(params).map(function (k) { return k + '=' + encodeURIComponent(params[k]); }).join('&');
+  return fetch(API + '?' + q).then(parseApi_);
+}
+function apiPost(obj) {
+  // Gövde text/plain JSON: CORS preflight tetiklemez, Apps Script doPost ile uyumlu
+  return fetch(API, { method: 'POST', body: JSON.stringify(obj) }).then(parseApi_);
+}
+function parseApi_(r) {
+  return r.text().then(function (t) {
+    var d;
+    try { d = JSON.parse(t); }
+    catch (e) { throw new Error('API yanıtı okunamadı — dağıtımın erişimi "Herkes" mi?'); }
+    if (d && d.error) throw new Error(d.error);
+    return d;
+  });
+}
+
+/* Türkçe normalize + benzerlik */
+var TRMAP = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'Ç': 'c', 'Ğ': 'g', 'Ö': 'o', 'Ş': 's', 'Ü': 'u' };
+function norm(s) {
+  return String(s || '')
+    .replace(/[çğıİöşüÇĞÖŞÜ]/g, function (c) { return TRMAP[c]; })
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function tokens(s) { return norm(s).split(' ').filter(function (w) { return w.length > 1; }); }
+function titleSim(a, b) {
+  var ta = tokens(a), tb = tokens(b);
+  if (!ta.length || !tb.length) return 0;
+  var setB = {}; tb.forEach(function (w) { setB[w] = 1; });
+  var hit = 0; ta.forEach(function (w) { if (setB[w]) hit++; });
+  return (2 * hit) / (ta.length + tb.length);
+}
+function authorMatch(a, b) {
+  if (!a || !b) return false;
+  var ta = tokens(a), tb = tokens(b), setB = {};
+  tb.forEach(function (w) { setB[w] = 1; });
+  return ta.some(function (w) { return setB[w] && w.length > 2; });
+}
+
+/* ================= Liste (önbellek) ================= */
+function loadLibrary() {
+  $('stats').innerHTML = '<span class="spin"></span> liste yükleniyor…';
+  apiGet({ action: 'library' })
+    .then(function (lib) {
+      LIB = lib;
+      $('stats').textContent = lib.books.length + ' kitap yüklü';
+      $('camBtn').disabled = false;
+      $('photoBtn').disabled = false;
+    })
+    .catch(function (e) {
+      $('stats').textContent = 'liste yüklenemedi';
+      showCard('err', '<h2>Liste yüklenemedi</h2><div class="meta">' + esc(e.message) + '</div>' +
+        '<div class="row2"><button class="btn btn-gray" onclick="loadLibrary()">Tekrar dene</button>' +
+        '<button class="btn btn-gray" onclick="openSetup()">Adresi değiştir</button></div>');
+    });
+}
+
+function findByIsbn(isbn) {
+  var i10 = isbn13to10(isbn);
+  for (var i = 0; i < LIB.books.length; i++) {
+    var b = String(LIB.books[i].isbn || '').replace(/[^0-9Xx]/g, '');
+    if (b && (b === isbn || (i10 && b === i10))) return LIB.books[i];
+  }
+  return null;
+}
+function findByTitle(title, author) {
+  var best = null, bestScore = 0;
+  LIB.books.forEach(function (b) {
+    var s = titleSim(title, b.title);
+    if (s > bestScore) { bestScore = s; best = b; }
+  });
+  if (!best) return null;
+  var aOk = authorMatch(author, best.author);
+  if (bestScore >= 0.85 && aOk) return { book: best, sure: true };
+  if (bestScore >= 0.6 && (aOk || bestScore >= 0.9)) return { book: best, sure: false };
+  return null;
+}
+
+/* ================= ISBN ================= */
+function validIsbn13(code) {
+  code = String(code || '').replace(/[^0-9]/g, '');
+  if (code.length !== 13 || !/^97[89]/.test(code)) return null;
+  var sum = 0;
+  for (var i = 0; i < 12; i++) sum += (+code[i]) * (i % 2 ? 3 : 1);
+  if ((10 - sum % 10) % 10 !== +code[12]) return null;
+  return code;
+}
+function isbn13to10(c) {
+  if (!/^978/.test(c) || c.length !== 13) return null;
+  var body = c.substr(3, 9), sum = 0;
+  for (var i = 0; i < 9; i++) sum += (+body[i]) * (10 - i);
+  var chk = (11 - sum % 11) % 11;
+  return body + (chk === 10 ? 'X' : chk);
+}
+
+/* ================= Canlı kamera ================= */
+function toggleCam() { scanning ? stopCam() : startCam(); }
+
+function startCam() {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })
+    .then(function (s) {
+      stream = s;
+      var v = $('video'); v.srcObject = s; v.play();
+      $('videoBox').classList.add('on');
+      $('camBtn').textContent = '⏹ Taramayı Durdur';
+      $('camBtn').className = 'btn btn-gray';
+      scanning = true;
+      if ('BarcodeDetector' in window) {
+        detector = new BarcodeDetector({ formats: ['ean_13'] });
+        scanTimer = setInterval(pollNative, 220);
+      } else {
+        loadZxing();
+      }
+    })
+    .catch(function (e) {
+      toast(e.name === 'NotAllowedError'
+        ? 'Kamera izni verilmedi — tarayıcı ayarlarından izin ver, ya da 📸 Fotoğrafla Tara kullan'
+        : 'Kamera açılamadı: ' + e.message, 4500);
+    });
+}
+function stopCam() {
+  scanning = false;
+  clearInterval(scanTimer);
+  if (zxingReader) { try { zxingReader.reset(); } catch (e) {} zxingReader = null; }
+  if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+  $('videoBox').classList.remove('on');
+  $('camBtn').textContent = '📷 Canlı Taramayı Başlat';
+  $('camBtn').className = 'btn btn-green';
+}
+function pollNative() {
+  if (!scanning || busy) return;
+  detector.detect($('video')).then(function (codes) {
+    if (codes.length) onBarcode(codes[0].rawValue);
+  }).catch(function () {});
+}
+var zxingLoad = null;
+function loadZxingLib() {
+  if (window.ZXing) return Promise.resolve();
+  if (zxingLoad) return zxingLoad;
+  zxingLoad = new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+    s.onload = res;
+    s.onerror = function () { zxingLoad = null; rej(new Error('Barkod kütüphanesi yüklenemedi (internet?)')); };
+    document.head.appendChild(s);
+  });
+  return zxingLoad;
+}
+function loadZxing() {
+  loadZxingLib().then(function () {
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    zxingReader.decodeFromVideoElement($('video'), function (result) {
+      if (result && scanning && !busy) onBarcode(result.getText());
+    });
+  }).catch(function (e) { toast(e.message, 4000); stopCam(); });
+}
+
+/* ================= Fotoğraftan çözme ================= */
+function decodePhoto(file) {
+  toast('📷 Fotoğraf çözümleniyor…', 5000);
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function () {
+    detectFromImage(img).then(function (code) {
+      URL.revokeObjectURL(url);
+      if (!code) { toast('Barkod okunamadı — barkoda daha yakın, net bir foto dene', 4000); return; }
+      var isbn = validIsbn13(code);
+      if (!isbn) { toast(/^977/.test(code) ? 'Bu bir dergi barkodu (ISSN)' : 'ISBN barkodu değil: ' + code, 3500); return; }
+      beep(880, 120);
+      lastDetect = { code: '', t: 0 };
+      handleIsbn(isbn);
+    });
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); toast('Fotoğraf açılamadı', 3000); };
+  img.src = url;
+}
+
+function detectFromImage(img) {
+  var native = ('BarcodeDetector' in window)
+    ? new BarcodeDetector({ formats: ['ean_13'] }).detect(img)
+        .then(function (c) { return c.length ? c[0].rawValue : null; })
+        .catch(function () { return null; })
+    : Promise.resolve(null);
+  return native.then(function (code) {
+    if (code) return code;
+    return loadZxingLib()
+      .then(function () {
+        return zxingDecodeImage(img, 0)
+          .catch(function () { return zxingDecodeImage(img, 90); })
+          .catch(function () { return null; });
+      })
+      .catch(function () { return null; });
+  });
+}
+
+function zxingDecodeImage(img, deg) {
+  var w = img.naturalWidth, h = img.naturalHeight;
+  var scale = Math.min(1, 1600 / Math.max(w, h));
+  var sw = w * scale, sh = h * scale;
+  var c = document.createElement('canvas');
+  c.width = Math.round(deg % 180 ? sh : sw);
+  c.height = Math.round(deg % 180 ? sw : sh);
+  var ctx = c.getContext('2d');
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(deg * Math.PI / 180);
+  ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+  return new ZXing.BrowserMultiFormatReader()
+    .decodeFromImageUrl(c.toDataURL('image/jpeg', 0.92))
+    .then(function (r) { return r.getText(); });
+}
+
+function onBarcode(raw) {
+  var now = Date.now();
+  if (raw === lastDetect.code && now - lastDetect.t < 3000) return;
+  lastDetect = { code: raw, t: now };
+
+  var isbn = validIsbn13(raw);
+  if (!isbn) {
+    if (/^977/.test(raw)) toast('Bu bir dergi barkodu (ISSN) — atlandı');
+    return;
+  }
+  beep(880, 120);
+  handleIsbn(isbn);
+}
+
+/* ================= Ana akış ================= */
+function handleIsbn(isbn) {
+  if (busy) return;
+  if (scannedThisSession[isbn]) { toast('Bu barkod az önce okundu'); return; }
+  busy = true;
+
+  var hit = findByIsbn(isbn);
+  if (hit) {
+    scannedThisSession[isbn] = true;
+    showFound(hit, isbn, false);
+    busy = false;
+    return;
+  }
+
+  showCard('', '<h2><span class="spin"></span> ' + isbn + ' aranıyor…</h2>');
+  lookupBook(isbn).then(function (info) {
+    scannedThisSession[isbn] = true;
+    if (!info) { showNotFoundForm(isbn); busy = false; return; }
+    var m = findByTitle(info.title, info.author);
+    if (m && m.sure) showFound(m.book, isbn, true);
+    else if (m) showMaybe(m.book, info, isbn);
+    else showAddForm(info, isbn);
+    busy = false;
+  }).catch(function (e) {
+    showCard('err', '<h2>Arama hatası</h2><div class="meta">' + esc(e.message) + '</div>');
+    busy = false;
+  });
+}
+
+/* Google Books → Open Library */
+function lookupBook(isbn) {
+  return fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + '&country=TR')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.items && d.items.length) {
+        var v = d.items[0].volumeInfo;
+        return { title: v.title + (v.subtitle ? ': ' + v.subtitle : ''), author: (v.authors || []).join(', '), rawCat: (v.categories || []).join(' ') };
+      }
+      return fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + isbn + '&format=json&jscmd=data')
+        .then(function (r) { return r.json(); })
+        .then(function (d2) {
+          var b = d2['ISBN:' + isbn];
+          if (!b) return null;
+          return { title: b.title, author: (b.authors || []).map(function (a) { return a.name; }).join(', '), rawCat: (b.subjects || []).map(function (s) { return s.name; }).join(' ') };
+        });
+    });
+}
+
+function guessCategory(rawCat, title) {
+  var s = norm(rawCat + ' ' + title);
+  var map = [
+    [/science fiction|sci fi/, 'Bilim Kurgu'],
+    [/fantasy|fantastik/, 'Fantastik'],
+    [/philosoph|felsefe/, 'Felsefe'],
+    [/comic|graphic novel|cizgi/, 'Çizgi Roman'],
+    [/horror|korku/, 'Korku'],
+    [/humor|mizah/, 'Mizah'],
+    [/psycholog|psikoloji/, 'Psikoloji'],
+    [/drama|theater|tiyatro/, 'Tiyatro'],
+    [/physics|science|astronom|cosmolog|biology|mathemat|evrim|bilim/, 'Popüler Bilim']
+  ];
+  for (var i = 0; i < map.length; i++) if (map[i][0].test(s)) return map[i][1];
+  return '';
+}
+
+/* ================= Kartlar ================= */
+function showCard(cls, html) {
+  $('result').innerHTML = '<div class="card ' + cls + '">' + html + '</div>';
+  $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showFound(book, isbn, byTitle) {
+  beep(660, 80);
+  var needIsbn = !book.isbn && isbn;
+  var html = '<h2>✅ Listede var — #' + book.nu + '</h2>' +
+    '<div class="bookline">' + esc(book.title) + '</div>' +
+    '<div class="meta">' + esc(book.author) + ' · ' + esc(book.category) + '</div>';
+  if (needIsbn) {
+    html += '<div class="meta" style="margin-top:8px">Bu satıra ISBN işleyeyim mi? Sonraki taramalar anında eşleşir.</div>' +
+      '<div class="row2"><button class="btn btn-green" id="saveIsbnBtn">ISBN’i kaydet</button>' +
+      '<button class="btn btn-gray" onclick="clearCard()">Geç</button></div>';
+  }
+  showCard('ok', html);
+  addHist('ok', '#' + book.nu + ' ' + book.title);
+  if (needIsbn) {
+    $('saveIsbnBtn').onclick = function () {
+      var btn = this; btn.disabled = true;
+      apiPost({ action: 'saveIsbn', row: book.row, isbn: isbn })
+        .then(function () { book.isbn = isbn; toast('ISBN kaydedildi ✓'); clearCard(); })
+        .catch(function (e) { btn.disabled = false; toast('Hata: ' + e.message, 4000); });
+    };
+  } else if (!byTitle) {
+    setTimeout(clearCard, 2500);
+  }
+}
+
+function showMaybe(book, info, isbn) {
+  showCard('maybe',
+    '<h2>🤔 Bu aynı kitap olabilir mi?</h2>' +
+    '<div class="meta">Taranan:</div><div class="bookline">' + esc(info.title) + '</div><div class="meta">' + esc(info.author) + '</div>' +
+    '<div class="meta" style="margin-top:8px">Listedeki (#' + book.nu + '):</div><div class="bookline">' + esc(book.title) + '</div><div class="meta">' + esc(book.author) + '</div>' +
+    '<div class="row2"><button class="btn btn-green" id="sameBtn">Evet, aynı</button><button class="btn btn-blue" id="diffBtn">Hayır, yeni ekle</button></div>');
+  $('sameBtn').onclick = function () { showFound(book, isbn, true); };
+  $('diffBtn').onclick = function () { showAddForm(info, isbn); };
+}
+
+function showAddForm(info, isbn) {
+  var guess = guessCategory(info.rawCat || '', info.title);
+  var opts = LIB.categories.map(function (c) {
+    return '<option' + (c === guess ? ' selected' : '') + '>' + esc(c) + '</option>';
+  }).join('');
+  if (!guess) opts = '<option value="" selected disabled>Kategori seç…</option>' + opts;
+  showCard('new',
+    '<h2>🆕 Listede yok — ekleyelim mi?</h2>' +
+    '<label>Kitap Adı</label><input type="text" id="fTitle" value="' + esc(info.title) + '">' +
+    '<label>Yazar</label><input type="text" id="fAuthor" value="' + esc(info.author) + '">' +
+    '<label>Kategori</label><select id="fCat">' + opts + '</select>' +
+    '<div class="meta" style="margin-top:8px">ISBN: ' + isbn + '</div>' +
+    '<div class="row2"><button class="btn btn-green" id="addBtn">➕ Listeye Ekle</button><button class="btn btn-gray" id="cancelBtn">Vazgeç</button></div>');
+  $('addBtn').onclick = function () { submitAdd(isbn); };
+  $('cancelBtn').onclick = function () { delete scannedThisSession[isbn]; clearCard(); };
+}
+
+function showNotFoundForm(isbn) {
+  beep(220, 200);
+  showAddForm({ title: '', author: '', rawCat: '' }, isbn);
+  $('result').querySelector('h2').innerHTML = '⚠️ ' + isbn + ' hiçbir kaynakta bulunamadı — elle gir:';
+  addHist('err', isbn + ' bulunamadı');
+}
+
+function submitAdd(isbn) {
+  var title = $('fTitle').value.trim(), author = $('fAuthor').value.trim(), cat = $('fCat').value;
+  if (!title) { toast('Kitap adı boş olamaz'); return; }
+  if (!cat) { toast('Kategori seç'); return; }
+  var btn = $('addBtn'); btn.disabled = true; btn.textContent = 'Ekleniyor…';
+  apiPost({ action: 'add', title: title, author: author, category: cat, isbn: isbn })
+    .then(function (rec) {
+      LIB.books.push(rec);
+      $('stats').textContent = LIB.books.length + ' kitap yüklü';
+      toast('✓ #' + rec.nu + ' olarak eklendi');
+      addHist('new', '#' + rec.nu + ' ' + rec.title);
+      beep(1040, 120);
+      clearCard();
+    })
+    .catch(function (e) {
+      btn.disabled = false; btn.textContent = '➕ Listeye Ekle';
+      toast('Eklenemedi: ' + e.message, 4000);
+    });
+}
+
+function clearCard() { $('result').innerHTML = ''; }
+
+function addHist(cls, text) {
+  $('histTitle').style.display = 'block';
+  var d = document.createElement('div');
+  d.className = 'hitem';
+  d.innerHTML = '<span>' + esc(text) + '</span><span class="tag ' + cls + '">' + (cls === 'ok' ? 'VAR' : cls === 'new' ? 'EKLENDİ' : '!') + '</span>';
+  $('histList').prepend(d);
+}
+
+/* ================= Kurulum / başlat ================= */
+function openSetup() {
+  $('setupCard').style.display = 'block';
+  $('app').style.display = 'none';
+  $('apiInput').value = API || '';
+  clearCard();
+}
+function startApp() {
+  $('setupCard').style.display = 'none';
+  $('app').style.display = 'block';
+  loadLibrary();
+}
+
+$('apiSaveBtn').onclick = function () {
+  var u = $('apiInput').value.trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)) {
+    toast('Adres https://script.google.com/macros/s/…/exec biçiminde olmalı', 4000);
+    return;
+  }
+  API = u;
+  try { localStorage.setItem('kitaplikApiUrl', u); } catch (e) {}
+  startApp();
+};
+$('settingsLink').onclick = openSetup;
+
+$('camBtn').onclick = toggleCam;
+$('photoBtn').onclick = function () { $('photoInput').click(); };
+$('photoInput').addEventListener('change', function () {
+  if (this.files && this.files[0]) decodePhoto(this.files[0]);
+  this.value = '';
+});
+$('manualBtn').onclick = function () {
+  var isbn = validIsbn13($('manualIsbn').value);
+  if (!isbn) { toast('Geçersiz ISBN-13 (978/979 ile başlamalı)'); return; }
+  $('manualIsbn').value = '';
+  handleIsbn(isbn);
+};
+$('manualIsbn').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('manualBtn').click(); });
+
+try { API = localStorage.getItem('kitaplikApiUrl') || ''; } catch (e) {}
+if (API) startApp(); else openSetup();
+</script>
+</body>
+</html>
