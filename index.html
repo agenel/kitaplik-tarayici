@@ -405,6 +405,21 @@ function isbn13to10(c) {
   var chk = (11 - sum % 11) % 11;
   return body + (chk === 10 ? 'X' : chk);
 }
+/* Eski kitaplardaki 10 haneli ISBN'i 13 haneliye çevirir (elle giriş için) */
+function isbn10to13(raw) {
+  var c = String(raw || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (c.length !== 10) return null;
+  var sum = 0;
+  for (var i = 0; i < 10; i++) {
+    var v = c[i] === 'X' ? 10 : parseInt(c[i], 10);
+    if (isNaN(v) || (c[i] === 'X' && i !== 9)) return null;
+    sum += v * (10 - i);
+  }
+  if (sum % 11 !== 0) return null;
+  var body = '978' + c.slice(0, 9), s2 = 0;
+  for (i = 0; i < 12; i++) s2 += (+body[i]) * (i % 2 ? 3 : 1);
+  return body + ((10 - s2 % 10) % 10);
+}
 
 /* ================= Canlı kamera ================= */
 function toggleCam() { scanning ? stopCam() : startCam(); }
@@ -459,13 +474,26 @@ function loadZxingLib() {
   });
   return zxingLoad;
 }
+/* iOS Safari'de BarcodeDetector yok; ZXing ile kare-yakala-çöz döngüsü kullanılır
+   (fotoğraf modundakiyle aynı, kanıtlanmış yol) */
 function loadZxing() {
   loadZxingLib().then(function () {
     zxingReader = new ZXing.BrowserMultiFormatReader();
-    zxingReader.decodeFromVideoElement($('video'), function (result) {
-      if (result && scanning && !busy) onBarcode(result.getText());
-    });
+    scanTimer = setInterval(pollZxing, 450);
   }).catch(function (e) { toast(e.message, 4000); stopCam(); });
+}
+function pollZxing() {
+  if (!scanning || busy || !zxingReader) return;
+  var v = $('video');
+  if (!v.videoWidth) return;
+  var c = pollZxing._c || (pollZxing._c = document.createElement('canvas'));
+  var scale = Math.min(1, 900 / v.videoWidth);
+  c.width = Math.round(v.videoWidth * scale);
+  c.height = Math.round(v.videoHeight * scale);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  zxingReader.decodeFromImageUrl(c.toDataURL('image/jpeg', .8))
+    .then(function (r) { if (scanning && !busy) onBarcode(r.getText()); })
+    .catch(function () {});
 }
 
 /* ================= Fotoğraftan çözme ================= */
@@ -530,6 +558,7 @@ function onBarcode(raw) {
   var isbn = validIsbn13(raw);
   if (!isbn) {
     if (/^977/.test(raw)) toast('Bu bir dergi barkodu (ISSN) — atlandı');
+    else toast('Kitap barkodu değil: ' + raw + ' (ISBN 978/979 ile başlar)', 3000);
     return;
   }
   beep(880, 120);
@@ -746,8 +775,9 @@ $('photoInput').addEventListener('change', function () {
   this.value = '';
 });
 $('manualBtn').onclick = function () {
-  var isbn = validIsbn13($('manualIsbn').value);
-  if (!isbn) { toast('Geçersiz ISBN-13 (978/979 ile başlamalı)'); return; }
+  var raw = $('manualIsbn').value;
+  var isbn = validIsbn13(raw) || isbn10to13(raw);
+  if (!isbn) { toast('Geçersiz ISBN — 13 hane (978/979…) ya da eski 10 haneli ISBN gir'); return; }
   $('manualIsbn').value = '';
   handleIsbn(isbn);
 };
