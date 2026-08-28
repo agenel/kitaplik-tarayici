@@ -398,6 +398,15 @@ function validIsbn13(code) {
   if ((10 - sum % 10) % 10 !== +code[12]) return null;
   return code;
 }
+/* 977'li dergi (ISSN) barkodu: EAN-13 sağlaması geçerliyse kabul */
+function validMag13(code) {
+  code = String(code || '').replace(/[^0-9]/g, '');
+  if (code.length !== 13 || !/^977/.test(code)) return null;
+  var sum = 0;
+  for (var i = 0; i < 12; i++) sum += (+code[i]) * (i % 2 ? 3 : 1);
+  if ((10 - sum % 10) % 10 !== +code[12]) return null;
+  return code;
+}
 function isbn13to10(c) {
   if (!/^978/.test(c) || c.length !== 13) return null;
   var body = c.substr(3, 9), sum = 0;
@@ -505,8 +514,8 @@ function decodePhoto(file) {
     detectFromImage(img).then(function (code) {
       URL.revokeObjectURL(url);
       if (!code) { toast('Barkod okunamadı — barkoda daha yakın, net bir foto dene', 4000); return; }
-      var isbn = validIsbn13(code);
-      if (!isbn) { toast(/^977/.test(code) ? 'Bu bir dergi barkodu (ISSN)' : 'ISBN barkodu değil: ' + code, 3500); return; }
+      var isbn = validIsbn13(code) || validMag13(code);
+      if (!isbn) { toast('Kitap/dergi barkodu değil: ' + code, 3500); return; }
       beep(880, 120);
       lastDetect = { code: '', t: 0 };
       handleIsbn(isbn);
@@ -555,10 +564,9 @@ function onBarcode(raw) {
   if (raw === lastDetect.code && now - lastDetect.t < 3000) return;
   lastDetect = { code: raw, t: now };
 
-  var isbn = validIsbn13(raw);
+  var isbn = validIsbn13(raw) || validMag13(raw);
   if (!isbn) {
-    if (/^977/.test(raw)) toast('Bu bir dergi barkodu (ISSN) — atlandı');
-    else toast('Kitap barkodu değil: ' + raw + ' (ISBN 978/979 ile başlar)', 3000);
+    toast('Kitap/dergi barkodu değil: ' + raw, 3000);
     return;
   }
   beep(880, 120);
@@ -597,8 +605,8 @@ function handleIsbn(isbn) {
 /* Önce backend (D&R → Google Books → Open Library, sunucu taraflı); backend ulaşılamazsa istemciden dene */
 function lookupBook(isbn) {
   return apiGet({ action: 'lookup', isbn: isbn })
-    .then(function (d) { return (d && d.title) ? d : clientLookup(isbn); })
-    .catch(function () { return clientLookup(isbn); });
+    .then(function (d) { return (d && d.title) ? d : (/^977/.test(isbn) ? null : clientLookup(isbn)); })
+    .catch(function () { return /^977/.test(isbn) ? null : clientLookup(isbn); });
 }
 
 function clientLookup(isbn) {
@@ -701,8 +709,11 @@ function showAddForm(info, isbn) {
 
 function showNotFoundForm(isbn) {
   beep(220, 200);
-  showAddForm({ title: '', author: '', rawCat: '' }, isbn);
-  $('result').querySelector('h2').innerHTML = '⚠️ ' + isbn + ' hiçbir kaynakta bulunamadı — elle gir:';
+  var isMag = /^977/.test(isbn);
+  showAddForm({ title: '', author: '', rawCat: isMag ? 'dergi' : '' }, isbn);
+  $('result').querySelector('h2').innerHTML = isMag
+    ? '📰 Dergi barkodu ' + isbn + ' — adı bulunamadı, elle gir:'
+    : '⚠️ ' + isbn + ' hiçbir kaynakta bulunamadı — elle gir:';
   addHist('err', isbn + ' bulunamadı');
   logScan(isbn, '', '', 'Bulunamadı');
 }
@@ -776,8 +787,8 @@ $('photoInput').addEventListener('change', function () {
 });
 $('manualBtn').onclick = function () {
   var raw = $('manualIsbn').value;
-  var isbn = validIsbn13(raw) || isbn10to13(raw);
-  if (!isbn) { toast('Geçersiz ISBN — 13 hane (978/979…) ya da eski 10 haneli ISBN gir'); return; }
+  var isbn = validIsbn13(raw) || isbn10to13(raw) || validMag13(raw);
+  if (!isbn) { toast('Geçersiz kod — ISBN (978/979…), eski 10 haneli ISBN ya da dergi barkodu (977…) gir'); return; }
   $('manualIsbn').value = '';
   handleIsbn(isbn);
 };
